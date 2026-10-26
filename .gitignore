@@ -3,5 +3,6 @@ node_modules/
 .env
 .env.*
 !.env.example
+.mail-setup.md
 *.log
 .DS_Store

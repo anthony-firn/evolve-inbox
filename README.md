@@ -8,12 +8,17 @@ This is the inbox built for EvolveTech, extracted into a deployable Apache 2.0 p
 
 The demo uses three fictional messages and reserved example domains. It is read only and makes no mailbox API requests. The live EvolveTech mailbox requires its own password.
 
+[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/anthony-firn/evolve-inbox)
+
 ## What it does
 
 - Receives mail for individual aliases or a whole domain through Forward Email webhooks.
 - Shows HTML mail in a sandboxed frame, with a plain-text view and downloadable attachments.
 - Displays the SPF, DKIM and DMARC results reported by the forwarding provider.
 - Uses a responsive reader with light and dark themes, refresh and message deletion.
+- Searches subjects, senders, recipients and previews, with a filter for attachments.
+- Generates private setup files and checks DNS, API authentication and deployed storage.
+- Preserves concurrent inbox updates and deduplicates retries that have a matching Message-ID, content and recipients.
 - Keeps the inbox password in the browser tab's session storage, with a Lock button to clear it.
 
 ## Try it locally
@@ -35,12 +40,21 @@ For the browser checks, run `npx playwright install chromium` once, then `npm ru
 
 ## Deploy your own inbox
 
-1. Fork this repository and connect it to a Netlify site. The included `netlify.toml` builds the fictional demo into `public/` and deploys the mail function separately.
-2. Generate two independent random secrets: `MAIL_PASSWORD` for the reader and `MAIL_HOOK_SECRET` for inbound delivery. For each secret, use a password manager or run `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"` locally. Store the values in Netlify's private environment settings with the Functions scope enabled. Plans that require all scopes can use all scopes. Redeploy after setting them. No secret belongs in this repository or a DNS record in plaintext.
-3. Visit `https://YOUR-SITE.netlify.app/mail` and unlock it with `MAIL_PASSWORD`. An unauthenticated `GET /mail/api/messages` must return HTTP 401.
-4. Configure your domain with Forward Email using its [setup guide](https://forwardemail.net/en/faq). Its receiving MX hosts are `mx1.forwardemail.net` and `mx2.forwardemail.net`. Configure a webhook destination of `https://YOUR-SITE.netlify.app/mail/hook/YOUR_MAIL_HOOK_SECRET?raw=false`. The app uses parsed content, so raw MIME is unnecessary.
-5. For a catch-all, an example forwarding rule is `forward-email=/^(.*?)$/:https://YOUR-SITE.netlify.app/mail/hook/YOUR_MAIL_HOOK_SECRET?raw=false`. **Encrypt the complete forwarding rule before publishing it in DNS**, using Forward Email's [TXT encryption tool](https://forwardemail.net/en/encrypt), or configure a private alias in its account dashboard. DNS is public; publishing an unencrypted webhook secret would allow forged incoming messages. Review existing aliases before changing live mail routing.
-6. Send a real message to the domain from another account. Check delivery, message text, attachments and the reported sender checks in `/mail`. A successful webhook test by itself does not verify MX routing or SMTP delivery.
+Fork the repository and connect it to Netlify, then run this in your local clone with your own domain and production site URL:
+
+```sh
+npm ci
+npm run setup -- --domain example.com --site https://your-inbox.netlify.app --label "My Inbox"
+```
+
+The setup command generates independent secrets and creates private `.env` and `.mail-setup.md` files with your exact forwarding instructions. It does not print secrets, overwrite existing settings or change DNS. The default alias is `hello`; use `--alias support` for another address or explicitly choose `--alias '*'` for a catch-all.
+
+1. Import `.env` into Netlify's private environment settings with Functions scope and production context, then redeploy.
+2. Follow `.mail-setup.md` to configure a private Forward Email alias or encrypt the complete DNS forwarding rule before publishing it. Review existing mail routing before changing MX records.
+3. Open `https://YOUR-SITE.netlify.app/mail` and unlock with `MAIL_PASSWORD` from `.env`. The root page `/` remains the fictional demo.
+4. Run `npm run doctor` to check DNS, password protection and authenticated storage access. Then send a real message from another account to verify delivery, content and attachments.
+
+See the [complete setup guide](docs/setup.md) for settings, DNS records, troubleshooting, outbound mail and upgrading an existing installation. Both generated files contain private settings and are ignored by Git; keep them private. The doctor is read only and does not verify SMTP delivery.
 
 [Forward Email's webhook reference](https://forwardemail.net/en/faq#do-you-support-webhooks) describes the parsed JSON payload. [Netlify's Blobs documentation](https://docs.netlify.com/build/data-and-storage/netlify-blobs/) describes the site-wide storage used here. The project does not provision a domain, forwarding subscription or paid hosting. Provider usage limits and pricing still apply.
 
@@ -48,9 +62,11 @@ For the browser checks, run `npx playwright install chromium` once, then `npm ru
 
 Mail is kept in the site-wide `mail` store, with one `msg/<id>` object per message and an `index` object for the inbox list. Site-wide storage survives deployments. The list shows the newest 2,000 messages; older message objects are not automatically deleted.
 
-The reader and message API use `MAIL_PASSWORD`. Webhook delivery uses the independent `MAIL_HOOK_SECRET` in its URL. There are no credentials embedded in the reader page or demo. HTML mail is sandboxed and receives a policy that blocks scripts and remote images. The page also sends `Cache-Control: no-store`, `Referrer-Policy: no-referrer` and a restrictive Content Security Policy.
+The reader and message API use `MAIL_PASSWORD`. Webhook delivery uses the independent `MAIL_HOOK_SECRET` in its URL. There are no credentials embedded in the reader page or demo. HTML mail is sandboxed and receives a policy that blocks scripts and remote images. The page also sends `Cache-Control: no-store`, `Referrer-Policy: no-referrer` and a restrictive Content Security Policy. Parsed webhook JSON is limited to 5,000,000 bytes; hosting limits also apply.
 
-This is a small, single-owner inbox. It has one shared password, no second factor, no account system, no search, no outbound mail, no automated retention and no application-level rate limiter. Messages are not end-to-end encrypted: the forwarding provider and the hosting account can access them. Attachments are downloadable files, not malware-scanned by this app. The shared index uses read-modify-write, so simultaneous deliveries can race; webhook retries can also create duplicates. It is not a replacement for a full mail platform.
+Index updates use conditional writes with bounded retries, and storage failures return HTTP 503 so the forwarding provider can retry. Retries with the same Message-ID, content and recipients reuse the original message and receipt time. Messages without a Message-ID cannot be reliably deduplicated. Existing storage remains readable without migration; writes to multiple objects are not a transaction.
+
+This is a small, single-owner inbox. It has one shared password, no second factor, no account system, no outbound mail, no automated retention and no application-level rate limiter. Search covers the loaded metadata, not full message bodies. Messages are not end-to-end encrypted: the forwarding provider and the hosting account can access them. Attachments are downloadable files, not malware-scanned by this app. It is not a replacement for a full mail platform.
 
 ## API
 
@@ -58,13 +74,14 @@ This is a small, single-owner inbox. It has one shared password, no second facto
 | --- | --- | --- |
 | `GET /mail` | Unlock in the reader | Inbox interface |
 | `GET /mail/api/messages` | `Authorization: Bearer MAIL_PASSWORD` | Message metadata |
+| `GET /mail/api/status` | Same | Storage access, inbound configuration and latest receipt |
 | `GET /mail/api/messages/<id>` | Same | Message body and attachments |
 | `DELETE /mail/api/messages/<id>` | Same | Delete one message |
 | `POST /mail/hook/<secret>` | Webhook secret | Receive a parsed Forward Email message |
 
 ## Source
 
-`src/inbox.mjs` contains the handler and shared reader. `netlify/functions/mail.mjs` wires it into Netlify. `demo/messages.mjs` contains only fictional fixtures. `tools/build-demo.mjs` builds the static demo from the same reader, extracting CSS and JavaScript into separate files for a strict host policy.
+`src/inbox.mjs` contains the handler and shared reader; `src/incoming.mjs` validates deliveries and `src/mail-store.mjs` handles conditional storage updates. `netlify/functions/mail.mjs` wires it into Netlify. `tools/setup.mjs` and `tools/doctor.mjs` provide setup and diagnostics. `demo/messages.mjs` contains only fictional fixtures. `tools/build-demo.mjs` builds the static demo from the same reader, extracting CSS and JavaScript into separate files for a strict host policy.
 
 EvolveTech's original function lives in the [website repository](https://github.com/anthony-firn/evolvetech.dev). This standalone repository contains no mailbox exports, account passwords, webhook secrets or production provider settings.
 

@@ -8,6 +8,8 @@
   "author": "Anthony Firn",
   "engines": { "node": ">=22" },
   "scripts": {
+    "setup": "node tools/setup.mjs",
+    "doctor": "node tools/doctor.mjs",
     "test": "node --test test/*.test.mjs",
     "build": "node tools/build-demo.mjs",
     "preview": "node tools/preview.mjs",

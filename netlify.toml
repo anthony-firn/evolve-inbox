@@ -4,3 +4,9 @@
 
 [functions]
   node_bundler = "esbuild"
+
+[template.environment]
+  MAIL_PASSWORD = "Generate a unique random reader password (npm run setup)."
+  MAIL_HOOK_SECRET = "Generate a different random webhook secret (npm run setup)."
+  MAIL_LABEL = "Your inbox name"
+  MAIL_DOMAIN = "Your mail domain, such as example.com"
