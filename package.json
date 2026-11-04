@@ -1,20 +1,35 @@
 {
   "name": "evolve-inbox",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "A small open-source inbox for a custom domain, using inbound webhooks and Netlify Blobs.",
   "type": "module",
   "license": "Apache-2.0",
   "author": "Anthony Firn",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "setup": "node tools/setup.mjs",
     "doctor": "node tools/doctor.mjs",
     "test": "node --test test/*.test.mjs",
     "build": "node tools/build-demo.mjs",
     "preview": "node tools/preview.mjs",
-    "test:e2e": "npm run build && node test/browser.mjs"
+    "test:e2e": "npm run build && node test/browser.mjs",
+    "rotate": "node tools/rotate.mjs",
+    "typecheck": "tsc --noEmit --strict --target es2022 --module nodenext --lib es2023,dom test/client-types.mts"
   },
-  "dependencies": { "@netlify/blobs": "^11.1.6" },
-  "devDependencies": { "playwright": "^1.64.1" }
+  "dependencies": {
+    "@netlify/blobs": "^11.1.6"
+  },
+  "devDependencies": {
+    "playwright": "^1.64.1",
+    "typescript": "^7.0.2"
+  },
+  "exports": {
+    "./client": {
+      "types": "./src/client.d.mts",
+      "import": "./src/client.mjs"
+    }
+  }
 }

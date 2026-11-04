@@ -3,18 +3,18 @@ import { createInterface } from 'node:readline/promises';
 import { parseArgs } from 'node:util';
 import { createSetup } from '../src/setup.mjs';
 
-const usage = `Usage: npm run setup -- --domain example.com --site https://your-inbox.netlify.app [--label "My Inbox"] [--alias hello]
+const usage = `Usage: npm run setup -- --domain example.com --site https://your-inbox.netlify.app [--label "My Inbox"] [--alias hello] [--json]
 
 Without arguments, an interactive terminal prompts for the domain and site URL.
 Creates private .env and .mail-setup.md files; refuses to overwrite existing files.
 Use --alias '*' only if you want to receive mail for the whole domain.`;
 
 try {
-  const { values } = parseArgs({ options: { domain: { type: 'string' }, site: { type: 'string' }, label: { type: 'string' }, alias: { type: 'string' }, help: { type: 'boolean', short: 'h' } } });
+  const { values } = parseArgs({ options: { domain: { type: 'string' }, site: { type: 'string' }, label: { type: 'string' }, alias: { type: 'string' }, json: { type: 'boolean' }, help: { type: 'boolean', short: 'h' } } });
   if (values.help) console.log(usage);
   else {
     if (!values.domain || !values.site) {
-      if (!process.stdin.isTTY) throw new Error(usage);
+      if (values.json || !process.stdin.isTTY) throw new Error(usage);
       const input = createInterface({ input: process.stdin, output: process.stdout });
       try {
         values.domain ||= await input.question('Mail domain (example.com): ');
@@ -34,9 +34,10 @@ try {
       if (error.code === 'EEXIST') throw new Error('Setup files already exist. Edit them directly; setup will not overwrite settings or rotate your secrets.');
       throw error;
     }
-    console.log('Created private .env and .mail-setup.md files. Secrets were not printed.\nOpen .mail-setup.md for your deployment and forwarding instructions, then run npm run doctor.');
+    console.log(values.json ? JSON.stringify({ ok: true, schema: 'evolve-inbox.setup.v1', files: ['.env', '.mail-setup.md'] }) : 'Created private .env and .mail-setup.md files. Secrets were not printed.\nOpen .mail-setup.md for your deployment and forwarding instructions, then run npm run doctor.');
   }
 } catch (error) {
-  console.error(error.code ? 'Could not create setup files. Check arguments, file permissions and existing .env / .mail-setup.md files.' : error.message);
+  const message = error.code ? 'Could not create setup files. Check arguments, file permissions and existing .env / .mail-setup.md files.' : error.message;
+  if (process.argv.includes('--json')) console.log(JSON.stringify({ ok: false, error: message })); else console.error(message);
   process.exitCode = 1;
 }

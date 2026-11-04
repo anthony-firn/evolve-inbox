@@ -94,7 +94,7 @@ export async function diagnose(settings, { resolveMx, resolveTxt, fetch: request
     } catch { add(false, 'Could not resolve MX records. Check the domain and DNS propagation.'); }
     try {
       const records = (await resolveTxt(domain)).map((parts) => parts.join(''));
-      const exposed = records.some((record) => [settings.MAIL_PASSWORD, settings.MAIL_HOOK_SECRET].some((secret) => secret && record.includes(secret)) || /\/mail\/hook\//i.test(record));
+      const exposed = records.some((record) => [settings.MAIL_PASSWORD, settings.MAIL_HOOK_SECRET, settings.MAIL_PASSWORD_PREVIOUS, settings.MAIL_HOOK_SECRET_PREVIOUS].some((secret) => secret && record.includes(secret)) || /\/mail\/hook\//i.test(record));
       add(!exposed, exposed ? 'A mail secret or plaintext webhook is public in DNS. Remove it, rotate exposed secrets and use an encrypted rule or private alias.' : 'No plaintext inbox secret or webhook found in root TXT records. Verify the alias in Forward Email.');
     } catch (error) { add(error.code === 'ENODATA', error.code === 'ENODATA' ? 'No root TXT records; configure routing in the private alias dashboard.' : 'Could not inspect TXT records. Check DNS and retry.'); }
   }
@@ -102,7 +102,7 @@ export async function diagnose(settings, { resolveMx, resolveTxt, fetch: request
     const get = (path, headers) => request(site + '/mail/api/' + path, { headers, redirect: 'manual', signal: AbortSignal.timeout(10000) });
     try {
       const response = await get('messages');
-      add(response.status === 401, response.status === 401 ? 'The inbox API rejects requests without a password.' : 'The inbox API did not return 401 without a password. Check the deployment and routing.');
+      add(response.status === 401 || response.status === 429, response.status === 429 ? 'The inbox API rejects requests; authentication is temporarily throttled. Retry after the limit clears.' : response.status === 401 ? 'The inbox API rejects requests without a password.' : 'The inbox API did not return 401 without a password. Check the deployment and routing.');
     } catch { add(false, 'Could not reach the deployed inbox API. Check MAIL_SITE_URL and deploy the function.'); }
     if (hasSecrets) {
       try {

@@ -6,3 +6,5 @@ node_modules/
 .mail-setup.md
 *.log
 .DS_Store
+
+.env.rotation

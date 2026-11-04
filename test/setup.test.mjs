@@ -104,3 +104,18 @@ test('doctor handles network and DNS errors without exposing response bodies', a
   assert.ok(!JSON.stringify(result).includes('private DNS details'));
   assert.ok(!JSON.stringify(result).includes('private connection details'));
 });
+
+test('doctor recognizes throttling as protection and checks previous credentials for DNS exposure', async () => {
+  const { settings } = createSetup(options);
+  settings.MAIL_PASSWORD_PREVIOUS = 'private-old-reader';
+  const { checks } = diagnostics(settings, {
+    resolveTxt: async () => [['private-old-reader']],
+    fetch: async (url) => url.endsWith('/status')
+      ? Response.json({ ready: true, storage: 'ok', domain: settings.MAIL_DOMAIN })
+      : new Response('', { status: 429 }),
+  });
+  const result = await checks;
+  assert.ok(result.some((check) => check.ok && check.message.includes('throttled')));
+  assert.ok(result.some((check) => !check.ok && check.message.includes('public in DNS')));
+  assert.ok(!JSON.stringify(result).includes('private-old-reader'));
+});

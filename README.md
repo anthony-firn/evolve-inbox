@@ -66,7 +66,7 @@ The reader and message API use `MAIL_PASSWORD`. Webhook delivery uses the indepe
 
 Index updates use conditional writes with bounded retries, and storage failures return HTTP 503 so the forwarding provider can retry. Retries with the same Message-ID, content and recipients reuse the original message and receipt time. Messages without a Message-ID cannot be reliably deduplicated. Existing storage remains readable without migration; writes to multiple objects are not a transaction.
 
-This is a small, single-owner inbox. It has one shared password, no second factor, no account system, no outbound mail, no automated retention and no application-level rate limiter. Search covers the loaded metadata, not full message bodies. Messages are not end-to-end encrypted: the forwarding provider and the hosting account can access them. Attachments are downloadable files, not malware-scanned by this app. It is not a replacement for a full mail platform.
+This is a small, single-owner inbox. It has one shared password, no second factor, no account system, no outbound mail and no automated retention. Shared authentication reservations limit repeated reader guesses; bucket collisions and NAT can temporarily affect legitimate users. Search covers the loaded metadata, not full message bodies. Messages are not end-to-end encrypted: the forwarding provider and the hosting account can access them. Attachments are downloadable files, not malware-scanned by this app. It is not a replacement for a full mail platform.
 
 ## API
 
@@ -84,6 +84,12 @@ This is a small, single-owner inbox. It has one shared password, no second facto
 `src/inbox.mjs` contains the handler and shared reader; `src/incoming.mjs` validates deliveries and `src/mail-store.mjs` handles conditional storage updates. `netlify/functions/mail.mjs` wires it into Netlify. `tools/setup.mjs` and `tools/doctor.mjs` provide setup and diagnostics. `demo/messages.mjs` contains only fictional fixtures. `tools/build-demo.mjs` builds the static demo from the same reader, extracting CSS and JavaScript into separate files for a strict host policy.
 
 EvolveTech's original function lives in the [website repository](https://github.com/anthony-firn/evolvetech.dev). This standalone repository contains no mailbox exports, account passwords, webhook secrets or production provider settings.
+
+## Reliability and developer access (0.2)
+
+Reader authentication uses bounded reservations in shared storage, including across function instances. Previous reader and webhook credentials can be accepted during an explicit short rotation window. Structured audit events omit message data and credentials. Existing mail keys and current settings remain compatible.
+
+The Fetch client has TypeScript declarations, cancellation, typed errors and no automatic retries. Setup, doctor and staged rotation support JSON output. See the [client quickstart](docs/client.md) and [security case study](docs/security.md) for architecture, failure behavior, test evidence and operational limits. Run `npm test`, `npm run typecheck` and `npm run test:e2e` to check a release.
 
 ## License
 

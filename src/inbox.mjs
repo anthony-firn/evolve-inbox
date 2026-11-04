@@ -1,3 +1,4 @@
+import { same, credential, reserveAuthentication, auditEvent } from './security.mjs';
 // Evolve Inbox: receive Forward Email webhooks, store messages in Netlify Blobs, and read them at /mail.
 // Server-only settings: MAIL_HOOK_SECRET and MAIL_PASSWORD. No credentials or real messages belong in this source.
 import { getStore } from '@netlify/blobs';
@@ -7,21 +8,13 @@ import { metadata, updateIndex, writeJSON } from './mail-store.mjs';
 const noStore = { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer' };
 const json = (body, status = 200) => Response.json(body, { status, headers: noStore });
 
-/** Compares secrets without leaking how much of a guess was right. */
-function same(a, b) {
-  const x = new TextEncoder().encode(a);
-  const y = new TextEncoder().encode(b);
-  if (!y.length || x.length !== y.length) return false;
-  let diff = 0;
-  for (let i = 0; i < x.length; i++) diff |= x[i] ^ y[i];
-  return diff === 0;
-}
-
-/** A receiving inbox with injectable storage for local tests. Secrets are read only on the server. */
+/** A single-owner inbox; storage and telemetry are injectable for failure tests. */
 export function createInbox({
   store = () => getStore({ name: 'mail', consistency: 'strong' }),
   setting = (name) => globalThis.Netlify?.env.get(name) ?? process.env[name] ?? '',
   label = 'Evolve Inbox',
+  now = Date.now,
+  audit = (event) => console.info(JSON.stringify(event)),
 } = {}) {
   async function receive(req) {
     let item = await readIncoming(req);
@@ -36,14 +29,24 @@ export function createInbox({
     return new Response('ok', { headers: noStore });
   }
 
-  return async (req) => {
+  return async (req, context = {}) => {
+    const record = (event, surface) => auditEvent(audit, event, surface, now());
     const { pathname } = new URL(req.url);
 
     if (pathname.startsWith('/mail/hook/')) {
-      if (req.method !== 'POST' || !same(pathname.slice('/mail/hook/'.length), setting('MAIL_HOOK_SECRET'))) return new Response('not found', { status: 404 });
-      try { return await receive(req); }
+      if (req.method !== 'POST' || !credential(pathname.slice('/mail/hook/'.length), 'MAIL_HOOK_SECRET', setting, now())) {
+        if (req.method === 'POST') record('auth_rejected', 'inbound');
+        return new Response('not found', { status: 404 });
+      }
+      try {
+        const response = await receive(req);
+        record('delivery_accepted', 'inbound');
+        if (credential(pathname.slice('/mail/hook/'.length), 'MAIL_HOOK_SECRET', setting, now()) === 'previous') record('previous_credential_used', 'inbound');
+        return response;
+      }
       catch (error) {
         if (error instanceof InvalidMail) return json({ error: error.message }, error.status);
+        record('storage_unavailable', 'inbound');
         return new Response(JSON.stringify({ error: 'Delivery could not be stored. Please retry.' }), { status: 503, headers: { ...noStore, 'Content-Type': 'application/json', 'Retry-After': '5' } });
       }
     }
@@ -63,7 +66,22 @@ export function createInbox({
 
     if (pathname.startsWith('/mail/api/')) {
       const password = setting('MAIL_PASSWORD');
-      if (!same((req.headers.get('authorization') ?? '').replace(/^Bearer /, ''), password)) return json({ error: 'wrong password' }, 401);
+      try {
+        const reservation = await reserveAuthentication(store(), context, setting('MAIL_HOOK_SECRET') || password, now());
+        if (reservation.retryAfter) {
+          record('auth_throttled', 'reader');
+          return Response.json({ error: 'Too many authentication attempts. Please retry later.' }, {
+            status: 429, headers: { ...noStore, 'Retry-After': String(reservation.retryAfter) },
+          });
+        }
+        const accepted = credential((req.headers.get('authorization') ?? '').replace(/^Bearer /, ''), 'MAIL_PASSWORD', setting, now());
+        if (!accepted) { record('auth_rejected', 'reader'); return json({ error: 'wrong password' }, 401); }
+        await reservation.release();
+        if (accepted === 'previous') record('previous_credential_used', 'reader');
+      } catch {
+        record('storage_unavailable', 'reader');
+        return json({ error: 'Authentication storage is unavailable. Please retry.' }, 503);
+      }
       try {
         const s = store();
         if (pathname === '/mail/api/messages' && req.method === 'GET') return json((await s.get('index', { type: 'json' })) ?? []);
@@ -81,10 +99,11 @@ export function createInbox({
         if (one && req.method === 'DELETE') {
           await s.delete(`msg/${one[1]}`);
           await updateIndex(s, (index) => index.filter((m) => m.id !== one[1]));
+          record('message_deleted', 'reader');
           return json({ ok: true });
         }
         return json({ error: 'not found' }, 404);
-      } catch { return json({ error: 'Mailbox storage is unavailable. Please retry.' }, 503); }
+      } catch { record('storage_unavailable', 'reader'); return json({ error: 'Mailbox storage is unavailable. Please retry.' }, 503); }
     }
     return new Response('not found', { status: 404 });
   };
