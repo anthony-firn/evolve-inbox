@@ -17,7 +17,9 @@
     "preview": "node tools/preview.mjs",
     "test:e2e": "npm run build && node test/browser.mjs",
     "rotate": "node tools/rotate.mjs",
-    "typecheck": "tsc --noEmit --strict --target es2022 --module nodenext --lib es2023,dom test/client-types.mts"
+    "typecheck": "tsc --noEmit --strict --target es2022 --module nodenext --lib es2023,dom test/client-types.mts",
+    "sdk:pack": "node tools/pack-sdk.mjs",
+    "inbox": "node tools/inbox.mjs"
   },
   "dependencies": {
     "@netlify/blobs": "^11.1.6"
@@ -30,6 +32,10 @@
     "./client": {
       "types": "./src/client.d.mts",
       "import": "./src/client.mjs"
+    },
+    "./demo": {
+      "types": "./src/demo-client.d.mts",
+      "import": "./src/demo-client.mjs"
     }
   }
 }

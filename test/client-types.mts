@@ -12,3 +12,9 @@ void delay;
 client.get(123);
 // @ts-expect-error This API has no sending capability.
 client.send({ to: 'example@example.com' });
+
+// Offline examples share the typed live-client contract.
+import { createDemoClient } from '../src/demo-client.mjs';
+const demo = createDemoClient();
+const demoList: Promise<import('../src/client.mjs').MessageSummary[]> = demo.list();
+void demoList;

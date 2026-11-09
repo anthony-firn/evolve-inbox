@@ -14,7 +14,7 @@ export const messages = [
     subject: 'Notes from our project review', preview: 'The deployment notes are attached as a text file.',
     text: 'Hi Morgan,\n\nThe deployment notes are attached as a text file.\n\nEverything in this demo uses reserved example domains. No real email or passwords are included.\n\nSam',
     html: '', auth: { spf: 'pass', dkim: 'pass', dmarc: 'pass' },
-    attachments: [{ filename: 'project-notes.txt', contentType: 'text/plain', size: 74, data: Buffer.from('Demo project notes\n\nConfigure your domain, webhook and private inbox password.\n').toString('base64') }],
+    attachments: [{ filename: 'project-notes.txt', contentType: 'text/plain', size: 74, data: 'RGVtbyBwcm9qZWN0IG5vdGVzCgpDb25maWd1cmUgeW91ciBkb21haW4sIHdlYmhvb2sgYW5kIHByaXZhdGUgaW5ib3ggcGFzc3dvcmQuCg==' }],
   },
   {
     id: 'demo-checks-003', receivedAt: 1792911600000,

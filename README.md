@@ -94,3 +94,7 @@ The Fetch client has TypeScript declarations, cancellation, typed errors and no 
 ## License
 
 Apache License 2.0. Copyright 2026 Anthony Firn.
+
+## Developer quickstart
+
+[Install the client and try the read-only CLI](https://www.evolvetech.dev/developers/inbox/) with fictional mail and no account. `node tools/inbox.mjs --demo list` works from a checkout without contacting a server. `npm run sdk:pack` builds a dependency-free, npm-compatible tarball from an explicit source allowlist. See [the package guide](docs/sdk-readme.md) for TypeScript imports, cancellation, typed errors and live deployment settings.

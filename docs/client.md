@@ -1,6 +1,6 @@
 # Programmatic access
 
-Node 22+ or a modern browser with Fetch, AbortSignal.timeout and AbortSignal.any is required. This repository is not published to npm. Install a pinned Git commit or use the source module directly. After cloning and `npm ci`, a TypeScript consumer can import the package's `evolve-inbox/client` export (for an external project, install the local clone with `npm install /path/to/evolve-inbox`).
+Node 22+ or a modern browser with Fetch, AbortSignal.timeout and AbortSignal.any is required. A dependency-free developer tarball is available at [the developer quickstart](https://www.evolvetech.dev/developers/inbox/). It is installable with npm but is not published to the npm registry. You can also install a pinned Git commit or use the source module directly. After cloning and `npm ci`, a TypeScript consumer can import the package's `evolve-inbox/client` export (for an external project, install the local clone with `npm install /path/to/evolve-inbox`).
 
 ```ts
 import { createClient, InboxError } from 'evolve-inbox/client';
@@ -35,3 +35,7 @@ npm run typecheck
 ```
 
 Each `--json` command writes one JSON document, exits nonzero on failure and omits credentials. Setup returns private file names; doctor returns checks and `smtpDeliveryVerified: false`; rotation returns a private file name, grace deadline and `deployed: false`. Setup JSON mode requires arguments and never prompts. Review [security and rotation](security.md) before importing generated settings.
+
+## Offline quickstart
+
+Run `node tools/inbox.mjs --demo list` after cloning, or follow [the package guide](sdk-readme.md). The fixture client uses the same Fetch client and error handling with fictional mail and no network. `npm run sdk:pack` builds an explicit allowlist into a dependency-free tarball; no server settings, real mail or private files are included.
