@@ -98,3 +98,7 @@ Apache License 2.0. Copyright 2026 Anthony Firn.
 ## Developer quickstart
 
 [Install the client and try the read-only CLI](https://www.evolvetech.dev/developers/inbox/) with fictional mail and no account. `node tools/inbox.mjs --demo list` works from a checkout without contacting a server. `npm run sdk:pack` builds a dependency-free, npm-compatible tarball from an explicit source allowlist. See [the package guide](docs/sdk-readme.md) for TypeScript imports, cancellation, typed errors and live deployment settings.
+
+## Optional PostgreSQL server
+
+For a self-hosted Node.js inbox, an optional PostgreSQL adapter stores each message and its listing fields in one atomic row, with primary-key duplicate protection, versioned authentication reservations and transactional import. The existing Netlify Blobs deployment is unchanged. See [setup, schema, backup/restore, tests and limits](docs/postgres.md). This backend is locally tested against PostgreSQL 17; it is not the live EvolveTech mailbox.
