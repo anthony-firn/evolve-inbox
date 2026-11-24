@@ -19,6 +19,10 @@ export function createInbox({
   async function receive(req) {
     let item = await readIncoming(req);
     const s = store();
+    if (s.receiveMessage) {
+      await s.receiveMessage(item);
+      return new Response('ok', { headers: noStore });
+    }
     const key = `msg/${item.id}`;
     if (!await writeJSON(s, key, item, { onlyIfNew: true })) {
       item = await s.get(key, { type: 'json' });
@@ -97,8 +101,11 @@ export function createInbox({
           return item ? json(item) : json({ error: 'not found' }, 404);
         }
         if (one && req.method === 'DELETE') {
-          await s.delete(`msg/${one[1]}`);
-          await updateIndex(s, (index) => index.filter((m) => m.id !== one[1]));
+          if (s.deleteMessage) await s.deleteMessage(one[1]);
+          else {
+            await s.delete(`msg/${one[1]}`);
+            await updateIndex(s, (index) => index.filter((m) => m.id !== one[1]));
+          }
           record('message_deleted', 'reader');
           return json({ ok: true });
         }
